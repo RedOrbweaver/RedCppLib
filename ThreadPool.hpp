@@ -12,8 +12,8 @@ class ThreadPool
     using SimpleDispatchFunction = std::function<void()>;
     using SimpleReturnDispatchFunction = std::function<std::any()>;
 
-    using VariableDispatchFunction = std::function<void(std::any&)>;
-    using VariableReturnDispatchFunction = std::function<std::any(std::any&)>;
+    using VariableDispatchFunction = std::function<void(std::any)>;
+    using VariableReturnDispatchFunction = std::function<std::any(std::any)>;
 
     struct DispatchHandle
     {
@@ -22,6 +22,19 @@ class ThreadPool
         std::any result;
         std::atomic<bool> has_result = false;
         std::atomic<bool> done = false;
+        std::atomic<bool> running = false;
+        int index;
+        void Wait()
+        {
+            while(!running && !done);
+            std::unique_lock<std::mutex> lock(m);
+            cv.wait(lock, [&](){return done == true;}); // yes == true is necessary because of some std::atomic fuckery
+        }
+
+        DispatchHandle()
+        {
+
+        }
     };
 
     protected:
@@ -79,7 +92,7 @@ class ThreadPool
         public:
         std::any data;
         VariableDispatchFunction f;
-        DispatchVariableDispatchFunction(VariableDispatchFunction f, std::any& data)
+        DispatchVariableDispatchFunction(VariableDispatchFunction f, std::any data)
         {
             this->f = f;
             this->data = data;
@@ -100,7 +113,7 @@ class ThreadPool
         public:
         std::any data;
         VariableReturnDispatchFunction f;
-        DispatchVariableReturnDispatchFunction(VariableReturnDispatchFunction f, std::any& data)
+        DispatchVariableReturnDispatchFunction(VariableReturnDispatchFunction f, std::any data)
         {
             this->f = f;
             this->data = data;
@@ -120,18 +133,16 @@ class ThreadPool
         std::mutex m;
         std::thread thread;
         std::condition_variable v;
-
+        int index;
     };
     std::vector<std::shared_ptr<ThreadState>> threads;
     std::queue<std::shared_ptr<DispatchRunner>> queue;
     std::thread management_thread;
     std::mutex queue_mutex;
     bool kill = false;
+    int next_handle_index = 0;
+    int next_thread_index = 0;
 
-    void InitThreads(int n)
-    {
-
-    }
     void WorkingThread(std::shared_ptr<ThreadState> state)
     {
         std::unique_lock<std::mutex> lock{state->m};
@@ -140,21 +151,44 @@ class ThreadPool
         {
             state->ready = true;
             state->v.wait(lock);
+            //printf("thread %i woken up\n", state->index);
             if(kill)
                 return;
             state->ready = false;
-            while(queue_mutex.try_lock() && queue.size() > 0)
+            while(queue.size() > 0) // it is possible for another thread to clear the queue before we lock it, be careful
             {
-                dispatch = queue.back();
+                queue_mutex.lock();
+                if(queue.size() == 0) 
+                {
+                    queue_mutex.unlock();
+                    break;
+                }
+                dispatch = queue.front();
                 queue.pop();
                 queue_mutex.unlock();
+
+                //printf("Executing dispatch %i, queue has %i dispatches left\n", dispatch->handle->index, queue.size());
+                
+                
+                dispatch->handle->running = true;
                 dispatch->Run();
                 dispatch->handle->done = true;
+                dispatch->handle->running = false;
                 dispatch->handle->has_result= dispatch->CanReturn();
-                dispatch->handle->m.unlock();
+                //dispatch->handle->m.unlock();
                 dispatch->handle->cv.notify_one();
+
                 dispatch = nullptr;
             }
+        }
+    }
+
+    void WakeUpThreads()
+    {
+        for(auto t : threads)
+        {
+            if(t->ready)
+                t->v.notify_one();
         }
     }
 
@@ -164,11 +198,13 @@ class ThreadPool
         Assert(runner != nullptr);
 
         auto h = std::make_shared<DispatchHandle>();
-        h->m.lock();
         runner->handle = h;
+        h->index = next_handle_index++;
         queue_mutex.lock();
         queue.push(runner);
         queue_mutex.unlock();
+        WakeUpThreads();
+        return h;
     }
     std::vector<std::shared_ptr<DispatchHandle>> DispatchMany(std::vector<std::shared_ptr<DispatchRunner>> runners)
     {
@@ -182,8 +218,9 @@ class ThreadPool
             Assert(r != nullptr);
 
             auto h = std::make_shared<DispatchHandle>();
-            h->m.lock();
             r->handle = h;
+            r->handle->index = next_handle_index++;
+            ret.push_back(h);
         }
         queue_mutex.lock();
         for(auto r : runners)
@@ -191,6 +228,9 @@ class ThreadPool
             queue.push(r);
         }
         queue_mutex.unlock();
+
+        WakeUpThreads();
+        return ret;
     }
 
     public:
@@ -264,7 +304,7 @@ class ThreadPool
     {
         return DispatchOne(std::make_shared<DispatchVariableDispatchFunction>(function, data));
     }
-    std::vector<std::shared_ptr<DispatchHandle>> Dispatch(VariableDispatchFunction function, int n, std::any& data)
+    std::vector<std::shared_ptr<DispatchHandle>> Dispatch(VariableDispatchFunction function, int n, std::any data)
     {
         std::vector<std::shared_ptr<DispatchRunner>> fs;
         fs.reserve(n);
@@ -274,7 +314,17 @@ class ThreadPool
         }
         return DispatchMany(fs);
     }
-    std::vector<std::shared_ptr<DispatchHandle>> Dispatch(const std::vector<VariableDispatchFunction>& function, std::any& data)
+    std::vector<std::shared_ptr<DispatchHandle>> DispatchIndexed(VariableDispatchFunction function, int n)
+    {
+        std::vector<std::shared_ptr<DispatchRunner>> fs;
+        fs.reserve(n);
+        for(int i = 0; i < n; i++)
+        {
+            fs.push_back(std::make_shared<DispatchVariableDispatchFunction>(function, i));
+        }
+        return DispatchMany(fs);
+    }
+    std::vector<std::shared_ptr<DispatchHandle>> Dispatch(const std::vector<VariableDispatchFunction>& function, std::any data)
     {
         std::vector<std::shared_ptr<DispatchRunner>> fs;
         fs.reserve(function.size());
@@ -293,27 +343,8 @@ class ThreadPool
         {
             fs.push_back(std::make_shared<DispatchVariableDispatchFunction>(function, data[i]));
         }
+            
         return DispatchMany(fs);
-    }
-    std::vector<std::shared_ptr<DispatchHandle>> DispatchDataArray(VariableDispatchFunction* function, int n, std::vector<std::any> data)
-    {
-        std::vector<std::shared_ptr<DispatchRunner>> fs;
-        fs.reserve(n);
-        for(int i = 0; i < n; i++)
-        {
-            fs.push_back(std::make_shared<DispatchVariableDispatchFunction>(function[i], data[i]));
-        }
-        return DispatchMany(fs);
-    }
-    std::vector<std::shared_ptr<DispatchHandle>> DispatchDataArray(const std::vector<VariableDispatchFunction>& function, std::vector<std::any> data)
-    {
-        return DispatchDataArray((VariableDispatchFunction*)&function[0], (int)function.size(), (std::vector<std::any>)data);
-    }
-
-    //DispatchSimpleDispatchFunction
-    std::shared_ptr<DispatchHandle> Dispatch(SimpleReturnDispatchFunction function)
-    {
-        return DispatchOne(std::make_shared<DispatchSimpleReturnDispatchFunction>(function));
     }
     std::vector<std::shared_ptr<DispatchHandle>> Dispatch(SimpleReturnDispatchFunction function, int n)
     {
@@ -397,7 +428,8 @@ class ThreadPool
         for(int i = 0; i < nthreads; i++)
         {
             auto ts =std::make_shared<ThreadState>();
-            ts->thread = std::thread(this, ThreadPool::WorkingThread, ts);
+            ts->index = next_thread_index++;
+            ts->thread = std::thread(&ThreadPool::WorkingThread, this, ts);
             threads.push_back(ts);
         }
     }

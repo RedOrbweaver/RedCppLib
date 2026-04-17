@@ -59,7 +59,7 @@ class FailureException : public std::exception
 
 #endif
 
-inline static void Assertion(bool b=false)
+inline void _Assertion(bool b=false)
 {
     if(b)
         return;
@@ -70,7 +70,7 @@ inline static void Assertion(bool b=false)
     int cause_failure = 1/0;
     #endif;
 }
-inline static void Assertion(bool b, std::string condition)
+inline void _Assertion(bool b, std::string condition)
 {
     if (b)
         return;
@@ -83,7 +83,7 @@ inline static void Assertion(bool b, std::string condition)
     int cause_failure = 1/0;
     #endif;
 }
-inline static void Assertion(bool b, std::string condition, std::string message)
+inline void _Assertion(bool b, std::string condition, std::string message)
 {
     if(b)
         return;
@@ -123,12 +123,12 @@ inline void Failure(std::string message = "")
 #define PASTE(a,b) PASTE_I(a,b)
 #define PASTE_I(a,b) a##b
 
-#define Assert(...) PASTE(Assert_, COUNT_VARARGS(__VA_ARGS__)(__VA_ARGS__))
+#define Assert(...) PASTE(_Assert_, COUNT_VARARGS(__VA_ARGS__)(__VA_ARGS__))
 
 
-#define Assert_0() Assertion()
-#define Assert_1(cond) Assertion((cond), #cond)
-#define Assert_2(cond, msg) Assertion((cond), #cond, msg)
+#define _Assert_0() _Assertion()
+#define _Assert_1(cond) _Assertion((cond), #cond)
+#define _Assert_2(cond, msg) _Assertion((cond), #cond, msg)
 
 
 END_RED_NAMESPACE;
