@@ -15,6 +15,16 @@
 #include <memory>
 #include <malloc.h>
 #include <thread>
+#include <any>
+#include <mutex>
+#include <optional>
+#include <queue>
+#include <list>
+#include <condition_variable>
+
+#if __cpp_exceptions
+#include <exception>
+#endif
 
 #define PACK __attribute__ ((packed))
 #define ArraySize(a) (sizeof(a)/sizeof(a[0]))
@@ -25,11 +35,7 @@ using byte = uint8_t;
 #define BEGIN_RED_NAMESPACE namespace Red {
 #define END_RED_NAMESPACE }
 
+#include "Assert.hpp"
 #include "vec.hpp"
 #include "Containers.hpp"
 #include "ThreadPool.hpp"
-
-namespace Red
-{
-
-}
