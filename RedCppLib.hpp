@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <memory>
 #include <malloc.h>
+#include <thread>
 
 #define PACK __attribute__ ((packed))
 #define ArraySize(a) (sizeof(a)/sizeof(a[0]))
@@ -21,8 +22,12 @@
 using byte = uint8_t;
 #endif
 
-#include "Containers.hpp"
+#define BEGIN_RED_NAMESPACE namespace Red {
+#define END_RED_NAMESPACE }
 
+#include "vec.hpp"
+#include "Containers.hpp"
+#include "ThreadPool.hpp"
 
 namespace Red
 {
