@@ -79,7 +79,7 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
 {
     static_assert(LEN > 0);
     static_assert(sizeof(__priv::_vecn<T, LEN>) == sizeof(T) * LEN);
-    int32_t size()
+    static int32_t size()
     {
         return LEN;
     }
