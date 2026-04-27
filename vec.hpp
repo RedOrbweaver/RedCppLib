@@ -115,7 +115,7 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         }
         return sm;
     }
-    T length()
+    T length() const
     {
         T sm = this->data[0]*this->data[0];
         if constexpr(LEN > 1)
@@ -127,8 +127,12 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         }
         return sqrt(sm);
     }
+    static T length(const vec& v) 
+    {
+        return v.length();
+    }
 
-    vec normalized()
+    vec normalized() const
     {
         vec ret;
         T len = this->length();
@@ -139,7 +143,12 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         return ret;
     }
 
-    vec min(T vmin)
+    static vec normalized(const vec& v)
+    {
+        return v.normalized();
+    }
+
+    vec min(T vmin) const
     {
         vec ret;
         for(int32_t i=0; i < LEN; i++)
@@ -148,7 +157,7 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         }
         return ret;
     }
-    vec max(T vmax)
+    vec max(T vmax) const
     {
         vec ret;
         for(int32_t i=0; i < LEN; i++)
@@ -157,7 +166,7 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         }
         return ret;
     }
-    vec constrain(T vmin, T vmax)
+    vec constrain(T vmin, T vmax) const
     {
         vec ret;
         for(int32_t i=0; i < LEN; i++)
@@ -166,7 +175,7 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         }
         return ret;
     }
-    vec min(vec vmin)
+    vec min(vec vmin) const
     {
         vec ret;
         for(int32_t i=0; i < LEN; i++)
@@ -175,7 +184,7 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         }
         return ret;
     }
-    vec max(vec vmax)
+    vec max(vec vmax) const
     {
         vec ret;
         for(int32_t i=0; i < LEN; i++)
@@ -184,7 +193,7 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         }
         return ret;
     }
-    vec constrain(vec vmin, vec vmax)
+    vec constrain(vec vmin, vec vmax) const
     {
         vec ret;
         for(int32_t i=0; i < LEN; i++)
@@ -316,6 +325,16 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         return ret;
     }
 
+    constexpr const vec operator-() const
+    {
+        vec<T, LEN> ret;
+        for(int32_t i = 0; i < LEN; i++)
+        {
+            ret.data[i] = -this->data[i];
+        }
+        return ret;
+    }
+
 
     constexpr const vec& operator+=(const vec& v) 
     {
@@ -421,39 +440,37 @@ struct PACK vec  : public __priv::_vecn<T, LEN>
         return *this = *this ^ v;
     }
 
-
-    template<typename U=T>
-    typename std::enable_if<LEN>=2, vec<U, 2>>::type xy()
+    static T dot(const vec& left, const vec& right)
+        requires (std::same_as<T, float> || std::same_as<T, double>)
     {
-        return vec<U, 2>{this->data[0], this->data[1]};
-    }
-    template<typename U=T>
-    typename std::enable_if<LEN>=4, vec<U, 2>>::type zw()
-    {
-        return vec<U, 2>{this->data[2], this->data[3]};
-    }
-    template<typename U=T>
-    typename std::enable_if<LEN>=3, vec<U, 2>>::type yz()
-    {
-        return vec<U, 2>{this->data[1], this->data[2]};
-    }
-    template<typename U=T>
-    typename std::enable_if<LEN>=4, vec<U, 2>>::type xw()
-    {
-        return vec<U, 2>{this->data[0], this->data[3]};
-    }
-    template<typename U=T>
-    typename std::enable_if<LEN>=3, vec<U, 3>>::type xyz()
-    {
-        return vec<U, 3>{this->data[0], this->data[1], this->data[2]};
-    }
-    template<typename U=T>
-    typename std::enable_if<LEN>=4, vec<U, 4>>::type xyzw()
-    {
-        return vec<U, 4>{this->data[0], this->data[1], this->data[2], this->data[3]};
+        T ret = T(0);
+        for (auto i = 0; i < LEN; ++i)
+            ret += left.data[i] * right.data[i];
+        return ret;
     }
 
-    //auto operator<=> (const vec&) const = default;
+    T dot(const vec& other) const
+        requires (std::same_as<T, float> || std::same_as<T, double>)
+    {
+        return vec::dot(*this, other);
+    }
+    static vec cross(const vec& left, const vec& right)
+        requires ((std::same_as<T, float> || std::same_as<T, double>) && LEN == 3)
+    {
+        return vec{
+            left.data[1] * right.data[2] - left.data[2] * right.data[1],
+            left.data[2] * right.data[0] - left.data[0] * right.data[2],
+            left.data[0] * right.data[1] - left.data[1] * right.data[0]
+        };
+    }
+    vec cross(const vec& other) const
+        requires ((std::same_as<T, float> || std::same_as<T, double>) && LEN == 3)
+    {
+        return vec::cross(*this, other);
+    }
+
+    #include "vec_comb.hpp"
+
 };
 
 template<typename T>

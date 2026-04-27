@@ -21,12 +21,20 @@
 #include <queue>
 #include <list>
 #include <condition_variable>
+#include <concepts>
+#include <cstddef>
+#include <type_traits>
 
 #if __cpp_exceptions
 #include <exception>
 #endif
 
+#if USE_PACKED
 #define PACK __attribute__ ((packed))
+#else
+#define PACK
+#endif
+
 #define ArraySize(a) (sizeof(a)/sizeof(a[0]))
 #ifndef byte
 using byte = uint8_t;
