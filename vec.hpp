@@ -7,7 +7,7 @@ BEGIN_RED_NAMESPACE;
 namespace __priv
 {
     template<typename T, uint32_t LEN>
-    struct PACK _vecn
+    struct RED_PACK _vecn
     {
         union
         {
@@ -15,7 +15,7 @@ namespace __priv
         };
     };
     template<typename T>
-    struct PACK _vecn<T, 1>
+    struct RED_PACK _vecn<T, 1>
     {
         union
         {
@@ -28,7 +28,7 @@ namespace __priv
         };
     };
     template<typename T>
-    struct PACK _vecn<T, 2>
+    struct RED_PACK _vecn<T, 2>
     {
         union
         {
@@ -42,7 +42,7 @@ namespace __priv
         };
     };
     template<typename T>
-    struct PACK _vecn<T, 3>
+    struct RED_PACK _vecn<T, 3>
     {
         union
         {

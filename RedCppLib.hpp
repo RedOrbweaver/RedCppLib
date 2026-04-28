@@ -29,10 +29,12 @@
 #include <exception>
 #endif
 
-#if USE_PACKED
 #define PACK __attribute__ ((packed))
+
+#if USE_PACKED
+#define RED_PACK PACK
 #else
-#define PACK
+#define RED_PACK
 #endif
 
 #define ArraySize(a) (sizeof(a)/sizeof(a[0]))
